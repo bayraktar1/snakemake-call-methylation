@@ -1,0 +1,88 @@
+from pathlib import Path
+
+configfile: "config/config.yaml"
+f5 = Path(config["f5"])
+fq = Path(config["fq"])
+
+
+rule nanopolishIndexing:
+    input:
+        fq = fq / "{sample}.fastq",
+        f5 = f5 / "{sample}.fast5"
+    output:
+        index = "Nanopolish_results/{sample}.fastq.index",
+        fai = "Nanopolish_results/{sample}.fastq.index.fai",
+        gzi = "Nanopolish_results/{sample}.fastq.index.gzi",
+        readdb = "Nanopolish_results/{sample}.fastq.index.readdb"
+    threads: 1
+    container: "docker://depot.galaxyproject.org/singularity/nanopolish:0.13.1--ha077697_0"
+    log: "nanopolish_results/{sample}_index.log"
+    shell:
+        """
+        (nanopolish index -d {input.f5} {input.fq}) >{log} 2>&1
+        """
+
+rule minimap2Align:
+    input:
+        reference = config["ref"],
+        fq = fq / "{sample}.fastq"
+    output:
+        sam = temp("minimap2_results/{sample}.sam")
+    threads: 6
+    container: "docker://depot.galaxyproject.org/singularity/minimap2:2.24--h7132678_1"
+    log: "minimap2_results/{sample}_mapping.log"
+    shell:
+        """
+        (minimap2 -t {threads} -ax splice {input.reference} {input.fq} \ ) >{log} 2>&1
+        """
+
+rule samtools:
+    input:
+        sam = rules.minimap2Align.output.sam
+    output:
+        sorted = "minimap2_results/{sample}.bam",
+        index = "minimap2_results/{sample}.bam.index"
+    threads: 6
+    container: "docker://quay.io/biocontainers/samtools:1.16.1--h6899075_1"
+    log: "minimap2_results/{sample}_samtools.log"
+    shell:
+        """
+        (
+        samtools view -Sb {input.sam} | \
+        samtools sort -o {output.sorted}
+        samtools index {output.sorted}
+        ) >{log} 2>&1
+        """
+
+rule nanopolishCallMethylation:
+    input:
+        fq = fq / "{sample}.fastq",
+        bam = rules.samtools.output.sorted,
+        reference = config["ref"],
+        index = rules.nanopolishIndexing.output.index,
+        fai = rules.nanopolishIndexing.output.fai,
+        gzi = rules.nanopolishIndexing.output.gzi,
+        readdb = rules.nanopolishIndexing.output.readdb
+    output:
+        meth = "nanopolish_results/{sample}_methylation.tsv"
+    threads: 1
+    container: "docker://depot.galaxyproject.org/singularity/nanopolish:0.13.1--ha077697_0"
+    log: "nanopolish_results/{sample}_methylation.log"
+    shell:
+        """
+        nanopolish call-methylation -t {threads} \
+        -r {input.fq} -b {input.bam} -g {input.reference}
+        """
+
+rule calcMethylation:
+    input:
+        tsv = rules.nanopolishCallMethylation.output.meth
+    output:
+        freq = "nanopolish_results/frequency.tsv"
+    threads: 1
+    container: "docker://depot.galaxyproject.org/singularity/nanopolish:0.13.1--ha077697_0"
+    log: "nanopolish_results/frequency.log"
+    shell:
+        """
+        scripts/calculate_methylation_frequency.py
+        """

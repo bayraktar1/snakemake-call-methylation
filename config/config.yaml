@@ -1,0 +1,8 @@
+# Directory containing fast5 files
+f5: "/home/dogukan/f5"
+
+# Directory containing fastq files
+fq: "/home/dogukan/f5"
+
+# Genome reference
+ref: "/home/dogukan/reference.fa"
