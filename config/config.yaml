@@ -1,8 +1,10 @@
+
+
 # Directory containing fast5 files
-f5: "/home/dogukan/f5"
+f5: "/home/bayraktar/PycharmProjects/snakemake-call-methylation/data/fast5"
 
 # Directory containing fastq files
-fq: "/home/dogukan/f5"
+fq: "/home/bayraktar/PycharmProjects/snakemake-call-methylation/data/fastq"
 
 # Genome reference
-ref: "/home/dogukan/reference.fa"
+ref: "/home/bayraktar/PycharmProjects/snakemake-call-methylation/data/Homo_sapiens.GRCh38.dna.primary_assembly.fa"

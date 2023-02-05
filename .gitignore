@@ -2,3 +2,6 @@
 .idea
 results
 data
+rulegraph.pdf
+resources
+run_snakemake.sh
