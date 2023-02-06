@@ -9,11 +9,11 @@ samples = [".".join(read.name.split('.')[:-1]) for read in fq_files]
 
 rule all:
     input:
-        index = expand(fq / "{sample}.fastq.index", sample=samples),
-        fai = expand(fq / "{sample}.fastq.index.fai", sample=samples),
-        gzi = expand(fq /"{sample}.fastq.index.gzi", sample=samples),
-        readdb = expand(fq / "{sample}.fastq.index.readdb", sample=samples),
-        sorted= expand("minimap2_results/{sample}.bam", sample=samples),
+        #index = expand(fq / "{sample}.fastq.index", sample=samples),
+        #fai = expand(fq / "{sample}.fastq.index.fai", sample=samples),
+        #gzi = expand(fq /"{sample}.fastq.index.gzi", sample=samples),
+        #readdb = expand(fq / "{sample}.fastq.index.readdb", sample=samples),
+        sorted= expand("results/minimap2_results/{sample}.bam", sample=samples),
 
 
 rule nanopolishIndexing:
@@ -21,13 +21,13 @@ rule nanopolishIndexing:
         fq = fq / "{sample}.fastq",
         f5 = f5
     output:
-        index = fq / "{sample}.fastq.index",
-        fai = fq / "{sample}.fastq.index.fai",
-        gzi = fq / "{sample}.fastq.index.gzi",
-        readdb = fq/ "{sample}.fastq.index.readdb"
+        index = "results/nanopolish_results/{sample}.fastq.index",
+        fai = "results/nanopolish_results/{sample}.fastq.index.fai",
+        gzi = "results/nanopolish_results/{sample}.fastq.index.gzi",
+        readdb = "results/nanopolish_results/{sample}.fastq.index.readdb"
     threads: 1
     container: "https://depot.galaxyproject.org/singularity/nanopolish:0.13.1--ha077697_0"
-    log: fq / "{sample}_index.log"
+    log: "results/nanopolish_results{sample}_index.log"
     shell:
         """
         (nanopolish index -d {input.f5} {input.fq}) >{log} 2>&1
@@ -38,24 +38,26 @@ rule minimap2Align:
         reference = config["ref"],
         fq = fq / "{sample}.fastq"
     output:
-        sam = temp("minimap2_results/{sample}.sam")
-    threads: 6
+        sam = temp("results/minimap2_results/{sample}.sam")
+    threads: 3
     container: "https://depot.galaxyproject.org/singularity/minimap2:2.24--h7132678_1"
-    log: "minimap2_results/{sample}_mapping.log"
+    log: "results/minimap2_results/{sample}_mapping.log"
     shell:
         """
-        (minimap2 -t {threads} -ax splice {input.reference} {input.fq} \ ) >{log} 2>&1
+        (
+        minimap2 -t {threads} -ax splice -uf -k14 --MD {input.reference} {input.fq} -o {output.sam}
+        ) >{log} 2>&1
         """
 
 rule samtools:
     input:
         sam = rules.minimap2Align.output.sam
     output:
-        sorted = "minimap2_results/{sample}.bam",
-        index = "minimap2_results/{sample}.bam.index"
+        sorted = "results/minimap2_results/{sample}.bam",
+        index = "resultsminimap2_results/{sample}.bam.index"
     threads: 6
     container: "https://quay.io/biocontainers/samtools:1.16.1--h6899075_1"
-    log: "minimap2_results/{sample}_samtools.log"
+    log: "results/minimap2_results/{sample}_samtools.log"
     shell:
         """
         (
