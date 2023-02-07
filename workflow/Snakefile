@@ -13,8 +13,8 @@ rule all:
         #fai = expand(fq / "{sample}.fastq.index.fai", sample=samples),
         #gzi = expand(fq /"{sample}.fastq.index.gzi", sample=samples),
         #readdb = expand(fq / "{sample}.fastq.index.readdb", sample=samples),
-        sorted= expand("results/minimap2_results/{sample}.bam", sample=samples),
-
+        #sorted= expand("results/minimap2_results/{sample}.bam", sample=samples),
+        meth = expand("results/nanopolish_results/{sample}_methylation.tsv", sample=samples)
 
 rule nanopolishIndexing:
     input:
@@ -54,9 +54,9 @@ rule samtools:
         sam = rules.minimap2Align.output.sam
     output:
         sorted = "results/minimap2_results/{sample}.bam",
-        index = "resultsminimap2_results/{sample}.bam.index"
+        bai = "results/minimap2_results/{sample}.bam.bai"
     threads: 6
-    container: "https://quay.io/biocontainers/samtools:1.16.1--h6899075_1"
+    container: "docker://quay.io/biocontainers/samtools:1.16.1--h6899075_1"
     log: "results/minimap2_results/{sample}_samtools.log"
     shell:
         """
@@ -72,15 +72,15 @@ rule nanopolishCallMethylation:
         fq = fq / "{sample}.fastq",
         bam = rules.samtools.output.sorted,
         reference = config["ref"],
-        index = rules.nanopolishIndexing.output.index,
+        bai = rules.nanopolishIndexing.output.index,
         fai = rules.nanopolishIndexing.output.fai,
         gzi = rules.nanopolishIndexing.output.gzi,
         readdb = rules.nanopolishIndexing.output.readdb
     output:
-        meth = "nanopolish_results/{sample}_methylation.tsv"
-    threads: 1
+        meth = "results/nanopolish_results/{sample}_methylation.tsv"
+    threads: 5
     container: "https://depot.galaxyproject.org/singularity/nanopolish:0.13.1--ha077697_0"
-    log: "nanopolish_results/{sample}_methylation.log"
+    log: "results/nanopolish_results/{sample}_methylation.log"
     shell:
         """
         nanopolish call-methylation -t {threads} \
