@@ -1,4 +1,11 @@
+# Sample file
+sample_file: "samples.csv"
 
+# Source data
+sourcedir: "~/Pycharmprojects/snakemake-call-methylation/data"
+
+# results are stored here
+results: "results"
 
 # Directory containing fast5 files
 f5: "/home/bayraktar/PycharmProjects/snakemake-call-methylation/data/fast5"

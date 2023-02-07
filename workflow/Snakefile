@@ -1,11 +1,24 @@
 from pathlib import Path
+import pandas as pd
 
+# Read configuration
 configfile: "config/config.yaml"
 f5 = Path(config["f5"])
 fq = Path(config["fq"])
+SOURCEDIR = Path(config["sourcedir"])
+OUTDIR = Path(config["results"])
 
-fq_files = [filepath for filepath in Path(fq).glob('**/*')]
-samples = [".".join(read.name.split('.')[:-1]) for read in fq_files]
+
+SAMPLE_DATA = pd.read_csv(config["sample_file"], comment="#")
+SAMPLES = SAMPLE_DATA["samplename"]
+
+if len(SAMPLES) != len(set(SAMPLES)):
+    raise RuntimeError("\n*** Samplenames are NOT unique. Please fix your sample definition file. Cannot continue... exiting. ***\n")
+
+# SAMPLE_LOCATION is a dict that can be used to find the .fastq files that belong to a particular sample
+SAMPLE_LOCATION = {i["samplename"] : f"{SOURCEDIR}/{i['samplename']}.fastq"
+    for idx, i in SAMPLE_DATA.iterrows()}
+
 
 rule all:
     input:
@@ -14,20 +27,20 @@ rule all:
         #gzi = expand(fq /"{sample}.fastq.index.gzi", sample=samples),
         #readdb = expand(fq / "{sample}.fastq.index.readdb", sample=samples),
         #sorted= expand("results/minimap2_results/{sample}.bam", sample=samples),
-        meth = expand("results/nanopolish_results/{sample}_methylation.tsv", sample=samples)
+        meth = expand("results/nanopolish_results/{sample}_methylation.tsv", sample=SAMPLES)
 
 rule nanopolishIndexing:
     input:
         fq = fq / "{sample}.fastq",
         f5 = f5
     output:
-        index = "results/nanopolish_results/{sample}.fastq.index",
-        fai = "results/nanopolish_results/{sample}.fastq.index.fai",
-        gzi = "results/nanopolish_results/{sample}.fastq.index.gzi",
-        readdb = "results/nanopolish_results/{sample}.fastq.index.readdb"
+        index = fq / "{sample}.fastq.index",
+        fai = fq / "{sample}.fastq.index.fai",
+        gzi = fq / "{sample}.fastq.index.gzi",
+        readdb = fq / "{sample}.fastq.index.readdb"
     threads: 1
     container: "https://depot.galaxyproject.org/singularity/nanopolish:0.13.1--ha077697_0"
-    log: "results/nanopolish_results{sample}_index.log"
+    log: "results/nanopolish_results/{sample}_index.log"
     shell:
         """
         (nanopolish index -d {input.f5} {input.fq}) >{log} 2>&1
@@ -39,13 +52,13 @@ rule minimap2Align:
         fq = fq / "{sample}.fastq"
     output:
         sam = temp("results/minimap2_results/{sample}.sam")
-    threads: 3
+    threads: 5
     container: "https://depot.galaxyproject.org/singularity/minimap2:2.24--h7132678_1"
     log: "results/minimap2_results/{sample}_mapping.log"
     shell:
         """
         (
-        minimap2 -t {threads} -ax splice -uf -k14 --MD {input.reference} {input.fq} -o {output.sam}
+        minimap2 -t {threads} -a -x map-ont {input.reference} {input.fq} -o {output.sam}
         ) >{log} 2>&1
         """
 
