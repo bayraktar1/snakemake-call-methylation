@@ -96,8 +96,10 @@ rule nanopolishCallMethylation:
     log: "results/nanopolish_results/{sample}_methylation.log"
     shell:
         """
+        (
         nanopolish call-methylation -t {threads} \
-        -r {input.fq} -b {input.bam} -g {input.reference}
+        -r {input.fq} -b {input.bam} -g {input.reference} > {output.meth}
+        ) >{log} 2>&1
         """
 
 rule calcMethylation:
