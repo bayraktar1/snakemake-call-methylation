@@ -27,7 +27,8 @@ rule all:
         #gzi = expand(fq /"{sample}.fastq.index.gzi", sample=samples),
         #readdb = expand(fq / "{sample}.fastq.index.readdb", sample=samples),
         #sorted= expand("results/minimap2_results/{sample}.bam", sample=samples),
-        meth = expand("results/nanopolish_results/{sample}_methylation.tsv", sample=SAMPLES)
+        #meth = expand("results/nanopolish_results/{sample}_methylation.tsv", sample=SAMPLES),
+        freq = expand("results/nanopolish_results/{sample}_frequency.tsv", sample=SAMPLES)
 
 rule nanopolishIndexing:
     input:
@@ -80,7 +81,7 @@ rule samtools:
         ) >{log} 2>&1
         """
 
-rule nanopolishCallMethylation:
+rule nanopolishCallMethyl:
     input:
         fq = fq / "{sample}.fastq",
         bam = rules.samtools.output.sorted,
@@ -102,17 +103,19 @@ rule nanopolishCallMethylation:
         ) >{log} 2>&1
         """
 
-rule calcMethylation:
+rule nanopolishCalcMethylFreq:
     input:
-        tsv = rules.nanopolishCallMethylation.output.meth
+        tsv = rules.nanopolishCallMethyl.output.meth
     output:
-        freq = "nanopolish_results/frequency.tsv"
+        freq = "results/nanopolish_results/{sample}_frequency.tsv"
     threads: 1
     container: "https://depot.galaxyproject.org/singularity/nanopolish:0.13.1--ha077697_0"
-    log: "nanopolish_results/frequency.log"
+    log: "results/nanopolish_results/{sample}_frequency.log"
     shell:
         """
-        scripts/calculate_methylation_frequency.py
+        (
+        python3 workflow/scripts/nanopolish_scripts/calculate_methylation_frequency.py {input.tsv} > {output.freq}
+        ) >{log} 2>&1
         """
 
 
