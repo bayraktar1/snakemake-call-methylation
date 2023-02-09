@@ -22,6 +22,7 @@ if len(SAMPLES) != len(set(SAMPLES)):
 # SAMPLE_LOCATION is a dict that can be used to find the .fastq files that belong to a particular sample
 SAMPLE_LOCATION = {i["samplename"] : f"{SOURCEDIR}/{i['samplename']}.fastq"
     for idx, i in SAMPLE_DATA.iterrows()}
+SAMPLE_LIST = list(SAMPLE_LOCATION.keys())
 
 # Load rules #
 
@@ -35,7 +36,96 @@ rule all:
         #fai = expand(fq / "{sample}.fastq.index.fai", sample=samples),
         #gzi = expand(fq /"{sample}.fastq.index.gzi", sample=samples),
         #readdb = expand(fq / "{sample}.fastq.index.readdb", sample=samples),
-        #sorted= expand("results/minimap2_results/{sample}.bam", sample=samples),
-        #meth = expand("results/nanopolish_results/{sample}_methylation.tsv", sample=SAMPLES),
-        freq = expand("results/nanopolish_results/{sample}_frequency.tsv", sample=SAMPLES)
+        #sorted= expand("results/minimap2/{sample}.bam", sample=samples),
+        #meth = expand("results/nanopolish/{sample}_methylation.tsv", sample=SAMPLES),
+        freq = expand("results/nanopolish/{sample}_frequency.tsv", sample=SAMPLES)
+
+rule copyData:
+    """
+    Makes a copy of the fast5 & fastq files.
+    Tombo modifies the files in place.
+    """
+    input:
+        fq = fq,
+        f5 = f5
+    output:
+        fq_c = "results/tombo/fq_re",
+        f5_c = "results/tombo/f5_re"
+    threads: 1
+    shell:
+        """
+        cp {input.f5} {output.f5_c}
+        cp {input.fq} {output.fq_c}
+        """
+
+rule multiToSingle:
+    """
+    Tombo does not support multi-read FAST5 format.
+    Convert multi-read format to single-read format.
+    """
+    input:
+        f5 = rules.copyData.input
+    output:
+        single_f5 = "results/tombo/f5_re_single",
+        seq_sum = "results/tombo/f5_re_single/sequencing_summary.txt"
+    threads: 1
+    container: "https://depot.galaxyproject.org/singularity/ont-fast5-api:4.0.0--pyhdfd78af_0"
+    log: "results/logs/multiToSingle.log"
+    shell:
+        """
+        (
+        multi_to_single_fast5 \
+            --input_path {input.f5} \
+            --save_path {output.single_f5} \
+            --recursive \
+            --threads {threads}
+        ) >{log} 2>&1
+        """
+
+rule tombo:
+    input:
+        single_f5 = rules.multiToSingle.output.single_f5,
+        seq_sum = rules.multiToSingle.output.seq_sum,
+        reference= config["ref"]
+    output:
+        tombo_stats = "results/tombo/methylation.tombo.stats"
+    params:
+        SAMPLE_LIST = list(SAMPLE_LOCATION.values())
+    threads: 3
+    container: "https://depot.galaxyproject.org/singularity/ont-tombo:1.5.1--py37r36h70f9b12_2"
+    log: "results/logs/preprocess.log"
+    shell:
+        """
+        (
+       
+        tombo preprocess annotate_raw_with_fastqs \
+            --fast5-basedir {input.single_f5} \
+            --fastq-filenames  {params.SAMPLE_LIST} \
+            --processes {threads} \
+            --sequencing-summary-filenames {input.seq_sum} \
+        
+        tombo resquiggle \
+            {input.single_f5} \
+            {input.reference} \
+            --processes {threads} \
+            --num-most-common-errors 5
+       
+       tombo detect_modifications alternative_model \
+            --fast5-basedirs {input.single_f5} \
+            --alternate-bases dam dcm \
+            --processes {threads}
+      
+      tombo detect_modifications de_novo \
+            --fast5-basedirs {input.single_f5} \ 
+            --statistics-file-basename methylation \
+            --processes {threads}
+       
+       tombo text_output browser_files \
+            --statistics-filename  \
+            --browser-file-basename \
+            --file-types statistic
+       
+        ) >{log} 2>&1
+        """
+
 
