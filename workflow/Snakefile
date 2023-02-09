@@ -1,17 +1,21 @@
+from snakemake.utils import min_version
 from pathlib import Path
 import pandas as pd
 
-# Read configuration
+# Minimum snakemake version #
+min_version("7.20.0")
+
+# Read configuration #
 configfile: "config/config.yaml"
 f5 = Path(config["f5"])
 fq = Path(config["fq"])
 SOURCEDIR = Path(config["sourcedir"])
 OUTDIR = Path(config["results"])
-
-
 SAMPLE_DATA = pd.read_csv(config["sample_file"], comment="#")
 SAMPLES = SAMPLE_DATA["samplename"]
 
+
+# Check if sample names in sample.csv are unique
 if len(SAMPLES) != len(set(SAMPLES)):
     raise RuntimeError("\n*** Samplenames are NOT unique. Please fix your sample definition file. Cannot continue... exiting. ***\n")
 
@@ -19,9 +23,11 @@ if len(SAMPLES) != len(set(SAMPLES)):
 SAMPLE_LOCATION = {i["samplename"] : f"{SOURCEDIR}/{i['samplename']}.fastq"
     for idx, i in SAMPLE_DATA.iterrows()}
 
-
+# Load rules #
 
 include: "rules/nanopolish.smk"
+
+# Target rules #
 
 rule all:
     input:
