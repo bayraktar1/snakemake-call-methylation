@@ -9,7 +9,7 @@ rule nanopolishIndexing:
         readdb = fq / "{sample}.fastq.index.readdb"
     threads: 1
     container: "https://depot.galaxyproject.org/singularity/nanopolish:0.13.1--ha077697_0"
-    log: "results/nanopolish_results/{sample}_index.log"
+    log: "results/logs/{sample}_index.log"
     shell:
         """
         (nanopolish index -d {input.f5} {input.fq}) >{log} 2>&1
@@ -20,10 +20,10 @@ rule minimap2Align:
         reference = config["ref"],
         fq = fq / "{sample}.fastq"
     output:
-        sam = temp("results/minimap2_results/{sample}.sam")
+        sam = temp("results/minimap2/{sample}.sam")
     threads: 5
     container: "https://depot.galaxyproject.org/singularity/minimap2:2.24--h7132678_1"
-    log: "results/minimap2_results/{sample}_mapping.log"
+    log: "results/logs/{sample}_mapping.log"
     shell:
         """
         (
@@ -35,11 +35,11 @@ rule samtools:
     input:
         sam = rules.minimap2Align.output.sam
     output:
-        sorted = "results/minimap2_results/{sample}.bam",
-        bai = "results/minimap2_results/{sample}.bam.bai"
+        sorted = "results/minimap2/{sample}.bam",
+        bai = "results/minimap2/{sample}.bam.bai"
     threads: 6
     container: "docker://quay.io/biocontainers/samtools:1.16.1--h6899075_1"
-    log: "results/minimap2_results/{sample}_samtools.log"
+    log: "results/logs/{sample}_samtools.log"
     shell:
         """
         (
@@ -59,10 +59,10 @@ rule nanopolishCallMethyl:
         gzi = rules.nanopolishIndexing.output.gzi,
         readdb = rules.nanopolishIndexing.output.readdb
     output:
-        meth = "results/nanopolish_results/{sample}_methylation.tsv"
+        meth = "results/nanopolish/{sample}_methylation.tsv"
     threads: 5
     container: "https://depot.galaxyproject.org/singularity/nanopolish:0.13.1--ha077697_0"
-    log: "results/nanopolish_results/{sample}_methylation.log"
+    log: "results/logs/{sample}_methylation.log"
     shell:
         """
         (
@@ -75,10 +75,10 @@ rule nanopolishCalcMethylFreq:
     input:
         tsv = rules.nanopolishCallMethyl.output.meth
     output:
-        freq = "results/nanopolish_results/{sample}_frequency.tsv"
+        freq = "results/nanopolish/{sample}_frequency.tsv"
     threads: 1
     container: "https://depot.galaxyproject.org/singularity/nanopolish:0.13.1--ha077697_0"
-    log: "results/nanopolish_results/{sample}_frequency.log"
+    log: "results/logs/{sample}_frequency.log"
     shell:
         """
         (
