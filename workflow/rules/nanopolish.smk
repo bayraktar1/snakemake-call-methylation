@@ -1,4 +1,8 @@
 rule nanopolishIndexing:
+    """
+    Creates index file that links read ids  with signal level data in
+     FAST5 files.
+    """
     input:
         fq = fq / "{sample}.fastq",
         f5 = f5
@@ -16,6 +20,9 @@ rule nanopolishIndexing:
         """
 
 rule minimap2Align:
+    """
+    Align reads to the genome.
+    """
     input:
         reference = config["ref"],
         fq = fq / "{sample}.fastq"
@@ -32,6 +39,11 @@ rule minimap2Align:
         """
 
 rule samtools:
+    """
+    Convert SAM to BAM.
+    Sorts BAM.
+    Creates sorted BAM index.
+    """
     input:
         sam = rules.minimap2Align.output.sam
     output:
@@ -50,6 +62,9 @@ rule samtools:
         """
 
 rule nanopolishCallMethyl:
+    """
+    Call methylation
+    """
     input:
         fq = fq / "{sample}.fastq",
         bam = rules.samtools.output.sorted,
@@ -72,6 +87,9 @@ rule nanopolishCallMethyl:
         """
 
 rule nanopolishCalcMethylFreq:
+    """
+    Calculate methylation frequency from called methylation.
+    """
     input:
         tsv = rules.nanopolishCallMethyl.output.meth
     output:
